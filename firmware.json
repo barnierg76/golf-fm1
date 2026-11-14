@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "golf",
+  "name": "Golf",
+  "author": "BARNIR",
+  "license": "MPL-2.0",
+  "tagline": "wavetable synthesizer with a step sequencer",
+  "description": "Golf for the M-VAVE FM-1: a wavetable synthesizer with a step sequencer. Two oscillators that morph through Golf's wavetables with up to seven unison voices and warps, a ladder filter with drive, two LFOs, a modulation matrix with key pressure, an arpeggiator, and drive, multiband compression, chorus, delay and reverb.",
+  "tags": ["synth"],
+  "install": "https://barnir-fm1.pages.dev/golf/install/",
+  "site": "https://barnir-fm1.pages.dev/golf/",
+  "source": "https://github.com/barnierg76/golf-fm1",
+  "screenshot": "screen.png",
+  "hardware": {
+    "models": ["FM-1"],
+    "flash": ["856014", "B36014"],
+    "features": ["usb-audio-in", "usb-audio-out", "second-core", "velocity", "pressure", "screen-reader", "screen-mirror"]
+  },
+  "credits": "Golf by BARNIR. Platform: fm1-base and felucca-bsp (MPL-2.0). Wavetables: Golf's own, and resyntheses of CC0 and CC BY sources (see TABELLEN.md)."
+}
