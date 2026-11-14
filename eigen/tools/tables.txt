@@ -1,0 +1,132 @@
+# De golftabellen van Golf voor de FM-1, in deze volgorde (een nummer in een preset: alleen achteraan toevoegen).
+# Bron: Golf/plugin/assets/tables (eigen formules en CC0/CC BY-resyntheses, zie TABELLEN.md). "=" is een eigen formule.
+=Basic Shapes
+Analog - Saw to Square
+Analog - Warm Saw
+Analog - Saw Stack
+Analog - Pulse Width
+Analog - PWM Smooth
+Analog - Sync Saw
+Analog - Sync Sweep
+Analog - Hoover
+Analog - Reese Source
+Analog - Acid Sweep
+Analog - Ladder Sweep
+Analog - Classic Morph
+Analog - Poly Pad
+Analog - Tube Strings
+Analog - Saw Sub
+Analog - Triangle to Saw
+Digital - FM 1-2
+Digital - FM 1-7
+Digital - FM Feedback
+Digital - FM Growl
+Digital - FM Bell Bass
+Digital - FM Lattice
+Digital - Fold Triangle
+Digital - Hyperfold
+Digital - Comb Sweep
+Digital - Phase Distortion Reso
+Digital - Phase Bloom
+Digital - Odd to Even
+Digital - Riddim
+Digital - Neuro
+Digital - Screech
+Digital - Chip
+Digital - Bitcrush Saw
+Digital - Metallic
+Digital - Laser
+Digital - Harmonic Steps
+Digital - Spiral Partials
+Digital - Xenharmonic
+Growl - Bite
+Growl - Jaw
+Growl - Wub
+Growl - Yoi
+Growl - Snarl
+Growl - Throat
+Growl - Reese Grind
+Growl - Squelch
+Growl - Scream
+Growl - Mouth Drive
+Vocal - Vowels AEIOU
+Vocal - Choir Aah
+Vocal - Choir Ah to Oo
+Vocal - Formant Sweep
+Vocal - Talk
+Vocal - Wow
+Vocal - Yeah
+Vocal - Throat Song
+Vocal - Vocoder
+Vocal - Angel
+Vocal - Bass AEIOU
+Keys - Digital EP
+Keys - Reed EP
+Keys - Grand Bright
+Keys - Vibraphone
+Keys - Kalimba
+Keys - Glockenspiel
+Keys - Clavinet Cycles
+Keys - Harp Bright
+Orchestra - Cello Section
+Orchestra - Violin Section
+Orchestra - French Horn
+Orchestra - Trumpet
+Orchestra - Flute
+Orchestra - Chapel Organ
+Orchestra - Clarinet
+Organic - Harmonium
+Organic - Music Box
+Organic - Glass Bell
+Organic - Koto
+Organic - Pipe Organ
+Organic - String Machine
+Organic - Strings to Voices
+Organic - Handpan
+Organic - Felt to Tine
+Spectral - Fifth Stack
+Spectral - Major Chord
+Spectral - Minor Seven
+Spectral - Octave Stack
+Spectral - Overtone Singer
+Spectral - Shimmer
+Spectral - Bell Chord
+Swarm - Seven Saws
+Swarm - Fifth Swarm
+Swarm - Octave Swarm
+Swarm - PWM Ensemble
+Swarm - Slow Choir Saws
+Textures - Singing Bowl
+Textures - Tubular Bell
+Textures - Warm to Glass
+Textures - Harmonic Bloom
+Cinematic - Dark Choir
+Cinematic - Horizon
+Cinematic - Bowed Metal
+Cinematic - Low Brass Blare
+Digital - FM 1-1
+Digital - Phase Distortion Saw
+Analog - Saw Filter Sweep
+Spectral - Soft Saw
+Analog - Tape Wear
+Organic - Ocarina
+Organic - Soft Brass
+Analog - Tape Saw
+Spectral - Dark Saw
+Spectral - Spectral Smear
+Organic - Cello
+Digital - Digital 2
+Analog - Sync Square
+Digital - FM 1-3
+Digital - FM 1-4
+Digital - FM 3-2
+Organic - Horn
+Spectral - Overtone Cycles
+Digital - Phase Grit
+Textures - Birds Cycles
+Organic - Oboe
+Spectral - Cloud
+Analog - Square Filter Sweep
+Organic - Felt Upright
+Analog - Poly Stack
+Analog - Poly Brass

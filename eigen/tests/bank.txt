@@ -1,0 +1,23 @@
+# Eigen golftabellen: een bank in het geheugen wordt bij het opstarten gevonden, een kapotte niet.
+wait 2500
+expect tables 130
+data golf/bank/extra.gfb 0x97000
+reboot
+wait 2500
+expect tables 136
+tap EDIT
+wait 50
+turn K1 140
+wait 6000
+expect par0 135
+expect table 135
+midi 90 3C 64
+wait 1500
+expect voices 1
+shot bank_tabel.png
+midi 80 3C 00
+# een byte kapot: de bank telt niet meer mee
+data_write 0x97100 55
+reboot
+wait 2500
+expect tables 130

@@ -1,0 +1,21 @@
+# Golf voor de FM-1: bouwinstellingen (fm1-base tools/build.py)
+name = "GOLF"
+id_prefix = "FM-1_28"            # eigen identiteit van dit firmwarepakket
+usb_manufacturer = "BARNIR"
+usb_product = "Golf FM-1"
+o2 = ["dsp/gf_engine.c"]         # de klankmotor apart, op -O2
+ble = false
+cpu2 = true                      # de tweede rekenkern: de helft van de stemmen
+cpu2_fallback = true             # valt hij uit, dan gaat het apparaat op een kern door
+cpu2_stack = 4096
+mirror = true                    # scherm en bediening over USB (tools/fm1_mirror.py): voor het testen op afstand
+tagline = "wavetable-synthesizer"
+repo = "https://github.com/barnierg76/golf-fm1"
+licence = "MPL-2.0"
+credits = "Golf by BARNIR. Platform: fm1-base and felucca-bsp (MPL-2.0). Wavetables: Golf's own, and resyntheses of CC0 and CC BY sources (see TABELLEN.md)."
+author = "BARNIR"
+description = "Golf for the M-VAVE FM-1: a wavetable synthesizer with a step sequencer. Two oscillators that morph through Golf's wavetables with up to seven unison voices and warps, a ladder filter with drive, two LFOs, a modulation matrix with key pressure, an arpeggiator, and drive, multiband compression, chorus, delay and reverb."
+tags = ["synth"]
+install = "https://barnir.pages.dev/golf/install/"
+site = "https://barnir.pages.dev/golf/"
+screenshot = "screen.png"
