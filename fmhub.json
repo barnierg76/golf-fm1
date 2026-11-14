@@ -1,0 +1,8 @@
+{
+  "what": "A wavetable synthesizer: two oscillators that morph through 130 wavetables, with unison and warps, a ladder filter, a modulation matrix and effects. Its 32-step sequencer can move the wavetable and the filter on every step.",
+  "author": "BARNIR",
+  "kinds": ["synth"],
+  "image": "screen.png",
+  "color": "#45D6A2",
+  "sounds": "own: wavetables stored as harmonics, made from formulas and from resyntheses of CC0 and CC BY sources credited in TABELLEN.md; no recorded audio"
+}
