@@ -2,7 +2,7 @@
 
 A firmware that turns the M-VAVE FM-1 into a wavetable synthesizer with a step sequencer. Free and open source.
 
-**Install it from the browser: <https://barnir.pages.dev/golf/>** (Chrome or Edge, a USB cable, about a minute).
+**Install it from the browser: <https://barnir-fm1.pages.dev/golf/>** (Chrome or Edge, a USB cable, about a minute).
 
 ![Golf on the FM-1's screen](screen.png)
 
