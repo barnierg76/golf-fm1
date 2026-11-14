@@ -85,3 +85,16 @@ Acht noten van de zwaarste presets (SUPERZAAG, OCTAAFZWERM, NEVELBANK): 76 tot 7
   van op een knop, zodat een meting geen knop meer nodig heeft.
 - Belasting op het apparaat met de sequencer aan: 14 % (REESE, de reeks alleen), 44 % met acht noten erbij, geen
   haperingen.
+
+## Uitbrengen en de site
+
+- **Een releasepakket heeft een eigen identiteit** (`--release 1.0` geeft FM-1_28010000). De web-installer van
+  fm1-base weigert een ontwikkelpakket. `fm1.toml` moet dan `install`, `repo`, `screenshot` en een licentie hebben.
+- **De web-installer van fm1-base is los te gebruiken**: `web/installer.html` met drie scripts erin gezet, precies
+  zoals `tools/make_site.py` het doet. De site (`FM1-Site/build.py`) zet er alleen kleuren en een kop omheen. In de
+  browser getest tot en met het bevestigingsvenster; het schrijven zelf niet.
+- **Vasthouden hoort op PLAY.** De sequencer nam PLAY over en vasthouden verhuisde naar twee knoppen samen; dat was
+  onhandig. Nu: PLAY is vasthouden, behalve op de sequencerpagina's, waar hij de reeks start. Loopt de reeks, dan
+  stopt PLAY hem overal.
+- **Voor het openbaar maken de geschiedenis doorzoeken.** Het e-mailadres stond in elke commit. Opgelost met een
+  nieuwe geschiedenis van een commit met het noreply-adres van GitHub; de oude staat lokaal op `prive-geschiedenis`.
