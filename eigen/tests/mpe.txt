@@ -1,0 +1,56 @@
+# MPE: its page (GLO three times), kept through a restart; notes on member channels.
+wait 2500
+expect mpe 0
+tap GLO
+wait 50
+tap GLO
+wait 50
+tap GLO
+wait 50
+expect page 17
+# from before MPE: SLIDE to the cutoff (5), +37, around the centre
+expect par1 5
+expect par2 101
+expect par3 0
+spin K1 1
+spin K2 -1
+spin K4 1
+wait 100
+expect par0 1
+expect par1 4
+expect par3 1
+expect mpe 48
+shot mpe_page.png
+# the same note on channels 2 and 3: two voices, each released by its own channel
+midi 91 3C 64
+midi 92 3C 64
+midi E1 00 50
+midi B1 4A 7F
+midi D1 60
+wait 500
+expect voices 2
+expect held 2
+midi 81 3C 00
+wait 100
+expect held 1
+midi 82 3C 00
+wait 100
+expect held 0
+wait 1200
+reboot
+wait 2500
+expect mpe 48
+expect page 17
+expect par1 4
+expect par3 1
+# off again: the channels are one, the same note is one voice (the simulator's restart keeps the page)
+spin K1 -1
+wait 100
+expect mpe 0
+midi 91 3C 64
+midi 92 3C 64
+wait 300
+expect voices 1
+midi 81 3C 00
+wait 100
+expect held 0

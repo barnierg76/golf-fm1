@@ -130,14 +130,29 @@ static void midi_in(void)                /* audio-interrupt */
     int port;
     while (plat_midi_in(&pkt, &port)) {
         uint32_t st = (pkt >> 8) & 0xF0u, d1 = (pkt >> 16) & 0x7Fu, d2 = (pkt >> 24) & 0x7Fu;
+        uint32_t ch = T.mpe ? (pkt >> 8) & 0x0Fu : 0u;   /* MPE: a member channel (0: the master channel, or MPE off) */
+        if (ch && (st == 0xE0u || st == 0xD0u || (st == 0xB0u && d1 == 74u))) {   /* its own bend, pressure, slide */
+            if (st == 0xE0u)
+                T.cbend[ch] = (int16_t)((int32_t)(d1 | d2 << 7) - 8192);
+            else if (st == 0xD0u)
+                T.cpress[ch] = (uint8_t)d1;
+            else
+                T.cslide[ch] = (uint8_t)d2;
+            continue;
+        }
         if (st == 0x90u && d2) {
             sus_held[d1 >> 5] &= ~(1u << (d1 & 31u));
+            T.note_ch = (uint8_t)ch;                 /* (the voice keeps the note's channel) */
             gf_note_on(&T, d1, d2);
+            T.note_ch = 0;
         } else if (st == 0x80u || st == 0x90u) {
-            if (sus_on)
+            if (sus_on) {
                 sus_held[d1 >> 5] |= 1u << (d1 & 31u);
-            else
+            } else {
+                T.note_ch = (uint8_t)ch;
                 gf_note_off(&T, d1);
+                T.note_ch = 0;
+            }
         } else if (st == 0xA0u) {                    /* de druk per toets */
             gf_pressure(&T, d1, d2);
         } else if (st == 0xD0u) {                    /* de druk van het hele klavier */
@@ -233,8 +248,12 @@ typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -3 .. +3 */
     uint8_t preset;                      /* 0 .. NFACT - 1 ingebouwd, daarna de eigen presets */
+    uint8_t mpe;                         /* MPE_NAME: 0 off, else the member channels' bend range */
+    uint8_t slide_dst, slide_amt;        /* MPE: where SLIDE goes, on top of the sound's routes (GF_D_..., 64 = 0) */
+    uint8_t slide_uni;                   /* 0: SLIDE around CC 74 = 64; 1: from 0 */
     uint8_t rsv[2];
 } state_t;
+#define STATE_V1 8                       /* its size before MPE */
 typedef struct {
     uint32_t magic;
     uint8_t used[NUSER];
@@ -254,10 +273,10 @@ static void bytes_copy(void *d, const void *s, uint32_t n)
 
 /* --------------------------------------------------------- de pagina's --- */
 enum { PG_PLAY, PG_WAVE, PG_SHAPE, PG_TUNE, PG_MIX, PG_VOICE, PG_FILT, PG_FENV, PG_AENV, PG_MENV, PG_LFO, PG_MTX, PG_FX,
-       PG_SPACE, PG_ARP, PG_SEQ, PG_SEQ2, NPG };
+       PG_SPACE, PG_ARP, PG_SEQ, PG_SEQ2, PG_MPE, NPG };
 enum { K_NONE, K_VAL, K_BI, K_TABLE, K_WARP, K_FILT, K_LFO, K_SRC, K_DST, K_MODE, K_ARPM, K_ARPR, K_OCT, K_SEMI, K_UNI,
-       K_SUBO, K_SLOT, K_BPM, K_AOCT, K_SNOTE, K_GATE, K_LOCK, K_SLEN, K_CUR };
-enum { W_GLOBAL, W_OSC, W_A, W_B, W_SLOT, W_UI, W_STEP, W_SEQ };      /* de klank, de gekozen oscillator, A, B, de gekozen route */
+       K_SUBO, K_SLOT, K_BPM, K_AOCT, K_SNOTE, K_GATE, K_LOCK, K_SLEN, K_CUR, K_MPE, K_SLIDE };
+enum { W_GLOBAL, W_OSC, W_A, W_B, W_SLOT, W_UI, W_STEP, W_SEQ, W_STATE };      /* de klank, de gekozen oscillator, A, B, de gekozen route */
 enum { C_OSC, C_FILT, C_ENV, C_LFO, C_MTX, C_FX, C_VOICE };
 typedef struct {
     const char *name;
@@ -268,9 +287,10 @@ typedef struct {
 #define MP(f) (uint8_t)__builtin_offsetof(gf_mod_t, f)
 #define SP(f) (uint8_t)__builtin_offsetof(gf_step_t, f)
 #define QP(f) (uint8_t)__builtin_offsetof(gf_seq_t, f)
+#define TP(f) (uint8_t)__builtin_offsetof(state_t, f)
 #define NO_ {"", 0, 0, K_NONE, 0}
 static const char *const PAGE_NAME[NPG] = {"PLAY", "WAVE", "SHAPE", "TUNE", "MIX", "VOICE", "FILTER", "FILTER ENV", "AMP ENV",
-                                           "MOD ENV", "LFO", "MATRIX", "EFFECTS", "SPACE", "ARP", "STEP", "PATTERN"};
+                                           "MOD ENV", "LFO", "MATRIX", "EFFECTS", "SPACE", "ARP", "STEP", "PATTERN", "MPE"};
 static const par_t PAGE[NPG][4] = {
     {{"MORPH A", W_A, OP(pos), K_VAL, C_OSC}, {"MORPH B", W_B, OP(pos), K_VAL, C_OSC}, {"CUTOFF", W_GLOBAL, GP(cut), K_VAL, C_FILT},
      {"RESO", W_GLOBAL, GP(res), K_VAL, C_FILT}},
@@ -304,17 +324,27 @@ static const par_t PAGE[NPG][4] = {
      {"MORPH", W_STEP, SP(morph), K_LOCK, C_OSC}},
     {{"LENGTH", W_SEQ, QP(len), K_SLEN, C_VOICE}, {"RATE", W_SEQ, QP(rate), K_ARPR, C_VOICE}, {"SWING", W_SEQ, QP(swing), K_VAL, C_VOICE},
      {"FILTER", W_STEP, SP(cut), K_LOCK, C_FILT}},
+    {{"MPE", W_STATE, TP(mpe), K_MPE, C_VOICE}, {"SLIDE TO", W_STATE, TP(slide_dst), K_DST, C_MTX},
+     {"AMOUNT", W_STATE, TP(slide_amt), K_BI, C_MTX}, {"SLIDE", W_STATE, TP(slide_uni), K_SLIDE, C_MTX}},
 };
 static const char *const GATE_NAME[GF_NGATE] = {"REST", "25", "50", "75", "100", "TIE"};
 static const char *const WARP_NAME[GF_NWARP] = {"OFF", "SYNC", "BEND", "ASYM", "PWM", "FOLD", "FM"};
 static const char *const FILT_NAME[GF_NFILT] = {"LADDER", "LOW 12", "BAND", "HIGH", "ACID"};
 static const char *const LFO_NAME[GF_NLFO] = {"SINE", "TRI", "SAW", "SQUARE", "S&H", "DRIFT"};
-static const char *const SRC_NAME[GF_NSRC] = {"-", "MOD ENV", "LFO 1", "LFO 2", "VELOCITY", "PRESSURE", "WHEEL", "KEY", "RANDOM"};
+static const char *const SRC_NAME[GF_NSRC] = {"-", "MOD ENV", "LFO 1", "LFO 2", "VELOCITY", "PRESSURE", "WHEEL", "KEY", "RANDOM", "SLIDE"};
 static const char *const DST_NAME[GF_NDST] = {"-", "PITCH", "MORPH A", "MORPH B", "MORPH", "CUTOFF", "RESO", "WARP A", "WARP B", "LEVEL A",
                                               "LEVEL B", "DETUNE", "PAN", "LFO1 RATE", "LFO2 RATE", "NOISE", "SUB", "VOLUME"};
 static const char *const MODE_NAME[GF_NMODE] = {"POLY", "MONO", "LEGATO"};
 static const char *const ARPM_NAME[GF_NARPMODE] = {"UP", "DOWN", "UP DOWN", "RANDOM", "PLAYED"};
 static const char *const ARPR_NAME[GF_NARPRATE] = {"1/4", "1/8", "1/8 T", "1/16", "1/16 T", "1/32"};
+/* MPE: off, or the bend range of the member channels (2 .. 16); 48 semitones is the MPE standard.
+ * SLIDE (CC 74) has a route of the device's own (SLIDE TO, AMOUNT), added to any MATRIX route that uses it, and
+ * rests at CC 74 = 64 (CENTRE) or at 0 (FROM 0), as the controller sends it. Kept with the device (state_t), not
+ * with the sound. */
+#define MPE_MODES 6u
+static const char *const MPE_NAME[MPE_MODES] = {"OFF", "48 ST", "2 ST", "12 ST", "24 ST", "96 ST"};
+static const uint8_t MPE_RANGE[MPE_MODES] = {0, 48, 2, 12, 24, 96};
+static uint32_t st_save_at;              /* the settings changed: keep them then (0: nothing to keep) */
 static const char OSC_LETTER[2][2] = {"A", "B"};
 
 /* --------------------------------------------------------------------- UI --- */
@@ -546,6 +576,16 @@ static void tables_sync(void)            /* de tabellen van de klank omzetten, e
         }
 }
 
+static void mpe_apply(int rest)          /* the MPE settings to the engine; rest: the channels back at rest too */
+{
+    T.slide.dst = (uint8_t)(st.slide_dst % GF_NDST);
+    T.slide.amt = st.slide_amt;
+    if (rest) {
+        T.slide_uni = st.slide_uni & 1u;
+        gf_mpe(&T, MPE_RANGE[st.mpe % MPE_MODES]);
+    }
+}
+
 void app_init(void)
 {
     uint32_t s;
@@ -567,11 +607,22 @@ void app_init(void)
     bytes_copy(&T.seq, &user.seq, sizeof T.seq);
     if (T.seq.len < 1u || T.seq.len > GF_SEQ_STEPS)
         T.seq.len = 16;
-    if (plat_store_load(OBJ_STATE, &st, sizeof st) != (int)sizeof st || st.magic != GFS_MAGIC || st.octave < -3 || st.octave > 3) {
-        st.magic = GFS_MAGIC;
-        st.octave = 0;
-        st.preset = 0;
+    {
+        int n = plat_store_load(OBJ_STATE, &st, sizeof st);
+        if ((n != (int)sizeof st && n != STATE_V1) || st.magic != GFS_MAGIC || st.octave < -3 || st.octave > 3) {
+            st.magic = GFS_MAGIC;
+            st.octave = 0;
+            st.preset = 0;
+            n = STATE_V1;
+        }
+        if (n == STATE_V1) {                         /* from before MPE: off, SLIDE to the cutoff, three octaves */
+            st.mpe = 0;
+            st.slide_dst = GF_D_CUT;
+            st.slide_amt = 101;
+            st.slide_uni = 0;
+        }
     }
+    mpe_apply(1);
     preset_load(st.preset);
     tables_sync();
 }
@@ -587,6 +638,7 @@ static uint8_t *par_ptr(const par_t *q)
     case W_UI: return &ui.slot;
     case W_STEP: return (uint8_t *)&T.seq.s[ui.cur % GF_SEQ_STEPS] + q->off;
     case W_SEQ: return (uint8_t *)&T.seq + q->off;
+    case W_STATE: return (uint8_t *)&st + q->off;
     default: return (uint8_t *)&T.p + q->off;
     }
 }
@@ -602,6 +654,8 @@ static void par_text(const par_t *q, char *t)
     case K_SRC: text_cat(t, SRC_NAME[v % GF_NSRC]); break;
     case K_DST: text_cat(t, DST_NAME[v % GF_NDST]); break;
     case K_MODE: text_cat(t, MODE_NAME[v % GF_NMODE]); break;
+    case K_MPE: text_cat(t, MPE_NAME[v % MPE_MODES]); break;
+    case K_SLIDE: text_cat(t, v ? "FROM 0" : "CENTRE"); break;
     case K_ARPM: text_cat(t, ARPM_NAME[v % GF_NARPMODE]); break;
     case K_ARPR: text_cat(t, ARPR_NAME[v % GF_NARPRATE]); break;
     case K_SUBO: text_cat(t, v ? "-2" : "-1"); break;
@@ -691,6 +745,8 @@ static void par_turn(uint32_t k, int32_t e)
     case K_SRC: v = clamp(*p + one, 0, GF_NSRC - 1); break;
     case K_DST: v = clamp(*p + one, 0, GF_NDST - 1); break;
     case K_MODE: v = clamp(*p + one, 0, GF_NMODE - 1); break;
+    case K_MPE: v = clamp(*p % MPE_MODES + one, 0, (int32_t)MPE_MODES - 1); break;
+    case K_SLIDE: v = clamp(*p + one, 0, 1); break;
     case K_ARPM: v = clamp(*p + one, 0, GF_NARPMODE - 1); break;
     case K_ARPR: v = clamp(*p + one, 0, GF_NARPRATE - 1); break;
     case K_SUBO: v = clamp(*p + one, 0, 1); break;
@@ -706,6 +762,9 @@ static void par_turn(uint32_t k, int32_t e)
         *p = (uint8_t)v;
         if (q->where == W_STEP || q->where == W_SEQ) {
             ui.seq_dirty = 1;
+        } else if (q->where == W_STATE) {            /* MPE: settings of the device, kept a second after the last turn */
+            mpe_apply(q->kind == K_MPE || q->kind == K_SLIDE);
+            st_save_at = plat_ms() + 1000u;
         } else if (q->kind != K_SLOT) {
             ui.dirty = 1;
             ui.rd_head = 1;
@@ -893,7 +952,7 @@ static void input(void)
                 page_set(PG_PLAY);
             break;
         case B_EDIT: page_set(ui.page >= PG_WAVE && ui.page < PG_TUNE ? ui.page + 1u : PG_WAVE); break;
-        case B_GLO: page_set(ui.page == PG_MIX ? PG_VOICE : PG_MIX); break;
+        case B_GLO: page_set(ui.page == PG_MIX ? PG_VOICE : ui.page == PG_VOICE ? PG_MPE : PG_MIX); break;
         case B_SEQ: page_set(ui.page == PG_SEQ ? PG_SEQ2 : PG_SEQ); break;
         case B_ENV: page_set(ui.page >= PG_FILT && ui.page < PG_MENV ? ui.page + 1u : PG_FILT); break;
         case B_LFO: page_set(ui.page == PG_LFO ? PG_MTX : PG_LFO); break;
@@ -986,7 +1045,7 @@ static void input(void)
     ui.btn = btn;
     /* de lampjes: de knop van de pagina, SAVE als de klank veranderd is, PLAY bij vasthouden, ARP, de toetsen die klinken */
     lit = btn;
-    lit |= ui.page == PG_PLAY ? 1u << B_HOME : ui.page <= PG_TUNE ? 1u << B_EDIT : ui.page <= PG_VOICE ? 1u << B_GLO
+    lit |= ui.page == PG_PLAY ? 1u << B_HOME : ui.page == PG_MPE ? 1u << B_GLO : ui.page <= PG_TUNE ? 1u << B_EDIT : ui.page <= PG_VOICE ? 1u << B_GLO
            : ui.page <= PG_MENV ? 1u << B_ENV : ui.page <= PG_MTX ? 1u << B_LFO : ui.page <= PG_SPACE ? 1u << B_FX
            : ui.page >= PG_SEQ ? 1u << B_SEQ : 0u;
     if (ui.dirty)
@@ -1306,6 +1365,8 @@ static void draw_bot(void)               /* 240 x 96: de pagina en haar vier reg
         case K_SRC: w = v * 56 / (GF_NSRC - 1); break;
         case K_DST: w = v * 56 / (GF_NDST - 1); break;
         case K_MODE: w = (v + 1) * 56 / GF_NMODE; break;
+        case K_MPE: w = v * 56 / ((int32_t)MPE_MODES - 1); break;
+        case K_SLIDE: w = (v + 1) * 28; break;
         case K_ARPM: w = (v + 1) * 56 / GF_NARPMODE; break;
         case K_ARPR: w = (v + 1) * 56 / GF_NARPRATE; break;
         case K_SUBO: w = (v + 1) * 28; break;
@@ -1402,6 +1463,10 @@ void app_frame(void)
         ui.rd_head = ui.rd_mid = ui.rd_bot = 1;
     }
     tables_sync();
+    if (st_save_at && (int32_t)(now - st_save_at) >= 0) {
+        st_save_at = 0;
+        plat_store_save(OBJ_STATE, &st, sizeof st);
+    }
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
         ui.rd_head = 1;
@@ -1483,6 +1548,8 @@ int app_expect(const char *what, int *got)
         *got = T.loaded[ui.osc];
     else if (!strcmp(what, "tables"))
         *got = (int)ntab;
+    else if (!strcmp(what, "mpe"))
+        *got = T.mpe;
     else if (!strcmp(what, "unicap"))
         *got = T.uni_cap;
     else
