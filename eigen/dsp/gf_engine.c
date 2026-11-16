@@ -187,6 +187,7 @@ static void voice_start(gf_t *t, gf_voice_t *v, uint32_t note, uint32_t vel, int
         retrig = 1;
     }
     v->note = (uint8_t)note;
+    v->ch = t->note_ch;
     v->vel = (uint8_t)vel;
     v->target = (float)note;
     v->gate = 1;
@@ -201,6 +202,8 @@ static void play_on(gf_t *t, uint32_t note, uint32_t vel)
     gf_voice_t *v = 0;
     uint32_t i;
     if (t->p.mode != GF_M_POLY) {                    /* een stem; de ingedrukte toetsen op een stapel */
+        /* ponytail: MPE in mono follows the channel of the last key pressed; after falling back to a key still held
+         * underneath, the voice keeps the released key's channel. Upgrade: keep the channel on the stack too. */
         int others = t->mono_n > 0;
         for (i = 0; i < t->mono_n; i++)
             if (t->stack[i] == note)
@@ -211,7 +214,7 @@ static void play_on(gf_t *t, uint32_t note, uint32_t vel)
         return;
     }
     for (i = 0; i < GF_NV && !v; i++)                /* dezelfde noot nog eens: dezelfde stem */
-        if (t->v[i].on && t->v[i].note == note)
+        if (t->v[i].on && t->v[i].note == note && t->v[i].ch == t->note_ch)   /* (MPE: on the same channel) */
             v = &t->v[i];
     for (i = 0; i < GF_NV && !v; i++)
         if (!t->v[i].on)
@@ -257,7 +260,7 @@ static void play_off(gf_t *t, uint32_t note)
         return;
     }
     for (i = 0; i < GF_NV; i++)
-        if (t->v[i].on && t->v[i].gate && t->v[i].note == note) {
+        if (t->v[i].on && t->v[i].gate && t->v[i].note == note && (!t->note_ch || t->v[i].ch == t->note_ch)) {
             t->v[i].gate = 0;
             t->v[i].stage[0] = t->v[i].stage[1] = 4;
         }
@@ -316,6 +319,17 @@ void gf_pressure(gf_t *t, uint32_t note, uint32_t value)
     for (i = 0; i < GF_NV; i++)
         if (t->v[i].on && t->v[i].note == note)
             t->v[i].press = (uint8_t)(value > 127u ? 127u : value);
+}
+
+void gf_mpe(gf_t *t, uint32_t range)
+{
+    uint32_t i;
+    t->mpe = (uint8_t)range;
+    for (i = 0; i < 16u; i++) {
+        t->cbend[i] = 0;
+        t->cpress[i] = 0;
+        t->cslide[i] = t->slide_uni ? 0 : 64;
+    }
 }
 
 void gf_all_off(gf_t *t)
@@ -692,7 +706,7 @@ GF_HOT static uint32_t voice_run(const gf_t *t, gf_voice_t *v, float *mixL, floa
     int32_t *aL = scr->aL, *aR = scr->aR, *mono = scr->mono;
     const gf_patch_t *P = &t->p;
     float ms[GF_NDST], src[GF_NSRC], note, cu, fc, g, G, k, dG, dk, amp, da, dgain, comp, pr, count = 0.0f;
-    uint32_t i, used = 0, ftype = P->ftype % GF_NFILT;
+    uint32_t i, used = 0, ftype = P->ftype % GF_NFILT, c = t->mpe ? v->ch & 15u : 0u;
     env_run(v, 0, &P->e[0]);
     env_run(v, 1, &P->e[1]);
     if (!v->stage[0] && v->amp < 0.0005f) {
@@ -700,6 +714,8 @@ GF_HOT static uint32_t voice_run(const gf_t *t, gf_voice_t *v, float *mixL, floa
         return 0;
     }
     pr = par(v->press > t->chpress ? v->press : t->chpress);
+    if (c && par(t->cpress[c]) > pr)                 /* MPE: the pressure on the note's own channel */
+        pr = par(t->cpress[c]);
     src[GF_S_NONE] = 0.0f;
     src[GF_S_ENV2] = v->env[1];
     src[GF_S_LFO1] = v->lval[0];
@@ -709,11 +725,13 @@ GF_HOT static uint32_t voice_run(const gf_t *t, gf_voice_t *v, float *mixL, floa
     src[GF_S_WHEEL] = par(t->wheel);
     src[GF_S_KEY] = clampf(((float)v->note - 60.0f) * (1.0f / 36.0f), -1.0f, 1.0f);
     src[GF_S_RAND] = v->rnd;
+    src[GF_S_SLIDE] = !c ? 0.0f : t->slide_uni ? par(t->cslide[c]) : ((float)t->cslide[c] - 64.0f) * (1.0f / 64.0f);
     for (i = 0; i < GF_NDST; i++)
         ms[i] = 0.0f;
-    for (i = 0; i < GF_NMOD; i++) {
-        float a = ((float)P->m[i].amt - 64.0f) * (1.0f / 63.0f), x = src[P->m[i].src % GF_NSRC];
-        uint32_t d = P->m[i].dst % GF_NDST;
+    for (i = 0; i < GF_NMOD + (c != 0u); i++) {      /* MPE: the device's own SLIDE route, on top of the sound's */
+        const gf_mod_t *m = i < GF_NMOD ? &P->m[i] : &t->slide;
+        float a = ((float)m->amt - 64.0f) * (1.0f / 63.0f), x = src[i < GF_NMOD ? m->src % GF_NSRC : GF_S_SLIDE];
+        uint32_t d = m->dst % GF_NDST;
         ms[d] += d == GF_D_PITCH ? x * a * a * a * 24.0f : x * a;   /* de toonhoogte fijn bij kleine waarden */
     }
     lfo_run(t, v, 0, ms[GF_D_LFO1]);
@@ -726,6 +744,8 @@ GF_HOT static uint32_t voice_run(const gf_t *t, gf_voice_t *v, float *mixL, floa
         v->pitch = v->target;
     }
     note = v->pitch + ms[GF_D_PITCH] + t->bend;
+    if (c)                                           /* MPE: the note's own bend, on top of the master channel's */
+        note += (float)t->cbend[c] * (float)t->mpe * (1.0f / 8192.0f);
     for (i = 0; i < GF_BLK; i++)
         aL[i] = aR[i] = mono[i] = 0;
     for (i = 2; i-- > 0;) {                          /* B eerst: zijn klank kan A bewegen (FM) */

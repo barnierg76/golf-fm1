@@ -19,7 +19,7 @@ van de plugin: de klankmotor is nieuw geschreven voor de kleine chip van de FM-1
 - **Filter**: ladder (24 dB), 12 dB, band, hoog en ACID, met resonantie, drive, een eigen envelope en volgen van
   de toetsen.
 - **Beweging**: twee envelopes, twee LFO's (sinus, driehoek, zaag, blok, S&H, drift) en zes routes. Bronnen:
-  MOD ENV, LFO 1 en 2, aanslag, de druk op een toets, het modulatiewiel, de toonhoogte en toeval.
+  MOD ENV, LFO 1 en 2, aanslag, de druk op een toets, het modulatiewiel, de toonhoogte, toeval en MPE-slide.
 - **Effecten**: drive, OTT (compressie in drie banden), chorus, delay en galm.
 - **Stepsequencer**: 32 stappen, per stap tot vier noten, aanslag, lengte (ook gebonden), en een eigen stand van
   de golftabel en van het filter. Zo beweegt een reeks ook door de klank. Hij loopt in de klankmotor zelf, dus
@@ -49,7 +49,7 @@ waren).
 | SELECT of SEL | oscillator A of B kiezen |
 | HOME | PLAY: morph A, morph B, cutoff, resonantie. Nog eens HOME: naar de volgende soort presets |
 | EDIT | de oscillator: WAVE, SHAPE, TUNE |
-| GLO | MIX (sub, ruis) en VOICE (poly/mono/legato, glijden, volume, tempo) |
+| GLO | MIX (sub, ruis), VOICE (poly/mono/legato, glijden, volume, tempo) en MPE |
 | ENV | FILTER, FILTER ENV, AMP ENV en MOD ENV |
 | SEQ | de sequencer: STEP (noot, aanslag, lengte, morph van de stap) en PATTERN (lengte, tempo-deling, swing, filter van de stap) |
 | LFO | LFO en MATRIX (de zes routes) |
@@ -65,6 +65,24 @@ licht op en beweegt mee met de routes. Rechts staat wat het filter doorlaat.
 Over MIDI: noten, toonhoogtewiel, modulatiewiel (CC 1), pedaal (CC 64), druk per toets en per kanaal, en een
 programmawissel kiest een preset. Elke regelaar van de klank is ook over MIDI te zetten: CC 102 kiest de regelaar
 (zijn plek in `gf_patch_t`), CC 103 zet de waarde. CC 105 laat de belasting van het apparaat op het scherm zien.
+
+### MPE
+
+Golf ondersteunt MIDI Polyphonic Expression (MPE): elke noot heeft zijn eigen buiging, druk en slide. Kanaal 1 is het
+hoofdkanaal (pedaal CC 64, het modulatiewiel, druk en de buiging voor alle noten). Kanaal 2 tot 16 dragen de buiging
+per noot, de druk per noot (kanaaldruk op het kanaal van de noot, de bron PRESSURE) en timbre/slide (CC 74, de bron
+SLIDE in de MATRIX). Op een controller zoals de LinnStrument is slide de Y-as. MPE heeft een eigen pagina bij GLO
+(drie keer GLO: MIX, VOICE, MPE).
+
+| | |
+| --- | --- |
+| K1 MPE | OFF, of het bereik van de buiging op de nootkanalen: 48 ST (de MPE-standaard), 2, 12, 24 of 96 |
+| K2 SLIDE TO | waar de Y-as (slide) heen gaat (standaard het filter), bovenop een route met SLIDE in de MATRIX van de preset; "-" zet hem uit |
+| K3 AMOUNT | hoe ver, op of neer (standaard drie octaven van het filter) |
+| K4 SLIDE | de rustpositie van de Y-as. CENTRE (standaard): CC 74 rust op 64 en beweegt twee kanten op; FROM 0: hij rust op 0 en beweegt een kant op |
+
+Dit zijn instellingen van het apparaat, niet van de preset. Noten van de arpeggiator en de sequencer volgen alleen de
+modulatie van het hoofdkanaal.
 
 De reeks van de sequencer wordt bewaard met SAVE op een sequencerpagina en blijft staan na uitzetten.
 

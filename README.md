@@ -19,7 +19,7 @@ Nederlands: [README.nl.md](README.nl.md).
 - **Sub and noise**, a **filter** (ladder 24 dB, 12 dB, band, high, acid) with resonance, drive, its own envelope and
   key tracking.
 - **Movement**: two envelopes, two LFOs, six modulation routes. Sources: mod envelope, both LFOs, velocity, key
-  pressure, mod wheel, pitch and chance.
+  pressure, mod wheel, pitch, chance and MPE slide.
 - **Step sequencer**: 32 steps, up to four notes per step, velocity, gate (with ties), swing, and per step its own
   wavetable position and filter offset. It runs inside the audio engine, so it is tight, and the arpeggiator can play
   its chords.
@@ -37,7 +37,7 @@ Nederlands: [README.nl.md](README.nl.md).
 | SELECT or SEL | oscillator A or B |
 | HOME | PLAY page: morph A, morph B, cutoff, resonance. Again: the next kind of preset |
 | EDIT | the oscillator: WAVE, SHAPE, TUNE |
-| GLO | MIX and VOICE (poly/mono/legato, glide, volume, tempo) |
+| GLO | MIX, VOICE (poly/mono/legato, glide, volume, tempo) and MPE |
 | ENV | FILTER, FILTER ENV, AMP ENV, MOD ENV |
 | LFO | LFO and MATRIX |
 | FX | EFFECTS and SPACE |
@@ -48,6 +48,22 @@ Nederlands: [README.nl.md](README.nl.md).
 
 SAVE on a sequencer page stores the pattern. MIDI: notes, pitch bend, mod wheel, sustain, pressure, program change;
 CC 102 selects a parameter (its offset in `gf_patch_t`) and CC 103 sets it; CC 105 shows the load on the screen.
+
+### MPE support
+
+Golf supports expressive controls via MIDI Polyphonic Expression (MPE), where each note has its own pitch bend, pressure and slide.
+Channel 1 is the master channel (with CC 64 sustain, the mod wheel, pressure and global pitch bend), and channels 2 to 16 carry per-note pitch bend, pressure (channel pressure on the note's channel, the PRESSURE source) and timbre/slide (CC 74, the SLIDE source in the MATRIX). On controllers such as the LinnStrument, slide is the Y axis. MPE has its own page in the GLO settings (GLO three times: MIX, VOICE, MPE).
+
+| | |
+| --- | --- |
+| K1 MPE | OFF, or the bend range of the member channels: 48 ST (the MPE standard), 2, 12, 24 or 96 |
+| K2 SLIDE TO | the Y-axis "slide" modulation mapping (filter cutoff by default), added to any SLIDE route in the preset's MATRIX; "-" turns it off |
+| K3 AMOUNT | how far, either way (the default is three octaves of cutoff) |
+| K4 SLIDE | the Y-axis rest position. CENTRE (default): CC 74 rests at 64 and moves both ways; FROM 0: it rests at 0 and moves one way |
+
+These are device settings, not part of the preset.
+
+Notes from the arpeggiator and the sequencer follow the modulation messages from the master channel only.
 
 ## Your own wavetables
 

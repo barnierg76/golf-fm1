@@ -281,6 +281,42 @@ int main(int argc, char **argv)
       for (k = 0; k < 2 * GF_FS / GF_BLK; k++) gf_render(&T, b, GF_BLK);
       for (i = 0; i < 2 * GF_BLK; i++) if (fabs(b[i] / 8388608.0) > tail) tail = fabs(b[i] / 8388608.0);
       check("sequencer: na stoppen stil", tail < 1e-4, tail, 0); }
+    /* MPE: a member channel's bend moves its own note only; its slide (CC 74) opens its note's filter */
+    basic();
+    gf_mpe(&T, 48);
+    { static int32_t b[2 * GF_BLK]; double c4, a440, a880, lo, hi;
+      T.note_ch = 1; gf_note_on(&T, 69, 100);        /* A4 on channel 2 */
+      T.note_ch = 2; gf_note_on(&T, 60, 100);        /* C4 on channel 3 */
+      T.note_ch = 0;
+      T.cbend[1] = 8192 * 12 / 48;                   /* channel 2 an octave up */
+      for (k = 0; k < GF_FS / GF_BLK; k++) {
+          gf_render(&T, b, GF_BLK);
+          for (i = 0; i < GF_BLK; i++) mono[k * GF_BLK + i] = b[2 * i] / 8388608.0;
+      }
+      c4 = tone(mono + GF_FS / 2, GF_FS / 2, 261.63); a440 = tone(mono + GF_FS / 2, GF_FS / 2, 440); a880 = tone(mono + GF_FS / 2, GF_FS / 2, 880);
+      check("MPE: channel 2's bend +12 st moves A4 to A5, C4 stays (dB over 440 Hz > 30)",
+            20 * log10(a880 / (a440 + 1e-12)) > 30 && 20 * log10(c4 / (a440 + 1e-12)) > 30, 20 * log10(a880 + 1e-12), 20 * log10(a440 + 1e-12));
+      T.note_ch = 2; gf_note_off(&T, 69); T.note_ch = 0;   /* a note off on another channel leaves it alone */
+      check("MPE: a note off on channel 3 does not release channel 2's note", T.v[0].gate && T.v[1].gate, T.v[0].gate, T.v[1].gate);
+      basic(); gf_mpe(&T, 48);
+      T.slide.dst = GF_D_CUT; T.slide.amt = 101;     /* the device's route: SLIDE to the cutoff */
+      T.p.m[GF_NMOD - 1].src = GF_S_SLIDE; T.p.m[GF_NMOD - 1].dst = GF_D_RES; T.p.m[GF_NMOD - 1].amt = 64;   /* the sound's
+                                                        * own SLIDE route (amount 0) must not switch the device's off */
+      T.p.o[0].pos = 85; T.p.cut = 50;               /* a saw, the filter half closed */
+      T.note_ch = 1; gf_note_on(&T, 45, 100); T.note_ch = 0;
+      for (lo = hi = 0, k = 0; k < 2 * GF_FS / GF_BLK; k++) {
+          if (k == GF_FS / GF_BLK) T.cslide[1] = 127;
+          gf_render(&T, b, GF_BLK);
+          if (k % (GF_FS / GF_BLK) >= GF_FS / GF_BLK / 2)
+              for (i = 0; i < GF_BLK; i++) *(k < GF_FS / GF_BLK ? &lo : &hi) += (double)b[2 * i] * b[2 * i];
+      }
+      check("MPE: slide up opens the note's filter (dB louder > 3)", 10 * log10(hi / (lo + 1e-12)) > 3, 10 * log10(hi / (lo + 1e-12)), 0);
+      T.mpe = 0;
+      for (lo = hi, hi = 0, k = 0; k < GF_FS / GF_BLK; k++) {
+          gf_render(&T, b, GF_BLK);
+          if (k >= GF_FS / GF_BLK / 2) for (i = 0; i < GF_BLK; i++) hi += (double)b[2 * i] * b[2 * i];
+      }
+      check("MPE off: the slide does nothing (dB quieter > 3)", 10 * log10(lo / (hi + 1e-12)) > 3, 10 * log10(lo / (hi + 1e-12)), 0); }
     /* na loslaten stil, voor elke preset; en niet tegen de begrenzer */
     for (k = 0; k < (int)GF_NPRESETS; k++) {
         static int32_t b[2 * GF_BLK]; double tail = 0;

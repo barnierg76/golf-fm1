@@ -36,7 +36,8 @@ typedef struct {
 enum { GF_W_OFF, GF_W_SYNC, GF_W_BEND, GF_W_ASYM, GF_W_PWM, GF_W_FOLD, GF_W_FM, GF_NWARP };
 enum { GF_F_LP24, GF_F_LP12, GF_F_BP, GF_F_HP, GF_F_ACID, GF_NFILT };
 enum { GF_L_SINE, GF_L_TRI, GF_L_SAW, GF_L_SQUARE, GF_L_SH, GF_L_DRIFT, GF_NLFO };
-enum { GF_S_NONE, GF_S_ENV2, GF_S_LFO1, GF_S_LFO2, GF_S_VELO, GF_S_PRESS, GF_S_WHEEL, GF_S_KEY, GF_S_RAND, GF_NSRC };
+enum { GF_S_NONE, GF_S_ENV2, GF_S_LFO1, GF_S_LFO2, GF_S_VELO, GF_S_PRESS, GF_S_WHEEL, GF_S_KEY, GF_S_RAND, GF_S_SLIDE,
+       GF_NSRC };
 enum { GF_D_NONE, GF_D_PITCH, GF_D_POSA, GF_D_POSB, GF_D_POSAB, GF_D_CUT, GF_D_RES, GF_D_WARPA, GF_D_WARPB, GF_D_LEVA,
        GF_D_LEVB, GF_D_DETUNE, GF_D_PAN, GF_D_LFO1, GF_D_LFO2, GF_D_NOISE, GF_D_SUB, GF_D_AMP, GF_NDST };
 enum { GF_M_POLY, GF_M_MONO, GF_M_LEGATO, GF_NMODE };
@@ -83,6 +84,7 @@ typedef struct {
 
 typedef struct {
     uint8_t on, gate, note, vel, press, stage[2], steal;
+    uint8_t ch;                        /* MPE: the member channel (1 .. 15) the note came on; 0 = none */
     uint32_t age;
     float env[2], pitch, target, lph[2], lval[2], lrnd[2][2], rnd;
     uint32_t ph[2][GF_NU], sph, nz, nz2;
@@ -102,6 +104,15 @@ typedef struct {
     /* spelen */
     uint8_t wheel, chpress, uni_cap;   /* uni_cap: hooguit zoveel stemmen unisono (de app verlaagt dit bij overbelasting) */
     float bend;                        /* halve tonen */
+    /* MPE: channel 1 is the master channel (bend, pressure and wheel of every note); a note on a
+     * member channel (2 .. 16) has that channel's own bend, pressure and slide (CC 74). Indexed by channel 0 .. 15. */
+    uint8_t mpe;                       /* 0 = off, else the member channels' bend range in semitones (gf_mpe) */
+    uint8_t slide_uni;                 /* SLIDE from CC 74: 0 = around 64 (-1 .. 1), 1 = from 0 (0 .. 1) */
+    gf_mod_t slide;                    /* the device's own route for SLIDE (dst, amt), added to the sound's routes */
+    uint8_t note_ch;                   /* the member channel of the note being started or released; 0 = none */
+    int16_t cbend[16];                 /* -8192 .. 8191 */
+    uint8_t cpress[16];                /* 0 .. 127 */
+    uint8_t cslide[16];                /* CC 74; at rest 64 or, with slide_uni, 0 */
     float last;                        /* de toonhoogte van de vorige noot: daar glijdt de volgende vandaan */
     uint8_t held[GF_NARP], heldv[GF_NARP], nheld, arp_note, arp_on, mono_n;
     uint8_t stack[GF_NARP];            /* mono: de ingedrukte toetsen, de laatste bovenop */
@@ -132,6 +143,8 @@ void gf_tables_sync(gf_t *t);          /* hoofdlus: zet de tabellen van de klank
 void gf_note_on(gf_t *t, uint32_t note, uint32_t vel);
 void gf_note_off(gf_t *t, uint32_t note);
 void gf_pressure(gf_t *t, uint32_t note, uint32_t value);   /* de druk op een toets (0 .. 127) */
+void gf_mpe(gf_t *t, uint32_t range);  /* MPE off (0) or on with this bend range in semitones; the channels at rest
+                                        * (set slide_uni first: it decides where SLIDE rests) */
 void gf_all_off(gf_t *t);
 void gf_render(gf_t *t, int32_t *lr, uint32_t n);   /* n veelvoud van GF_BLK; stereo, 24 bits, 44,1 kHz */
 uint32_t gf_voices(const gf_t *t);
